@@ -321,6 +321,10 @@ async function compositeScreenshot(dataUrl, rect, annotationNumber, annotationCo
     }
 
     // ─── Draw the cropped screenshot below ───────────────────────────────
+    // Background fill behind element (matches grid screenshot behavior)
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, headerHeight, finalWidth, cropH);
+
     // Center the screenshot if the header is wider
     const screenshotX = Math.round((finalWidth - cropW) / 2);
     ctx.drawImage(bitmap, cropX, cropY, cropW, cropH, screenshotX, headerHeight, cropW, cropH);

@@ -278,6 +278,8 @@ async function captureAnnotatedElement(marker) {
     restoreFns.push(hideElements(AGENTATION_SELECTORS.toolbar));
     restoreFns.push(hideElements(AGENTATION_SELECTORS.highlights));
     restoreFns.push(hideElements(AGENTATION_SELECTORS.highlightsContainer));
+    restoreFns.push(hideElements(AGENTATION_SELECTORS.hoverHighlight));
+    restoreFns.push(hideElements(AGENTATION_SELECTORS.hoverTooltip));
     restoreFns.push(hideElements(AGENTATION_SELECTORS.markerTooltips));
     restoreFns.push(hideElements(AGENTATION_SELECTORS.markers));
     restoreFns.push(hideElements(AGENTATION_SELECTORS.overlay));

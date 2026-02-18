@@ -5,9 +5,9 @@ A Chrome extension that brings [Agentation](https://agentation.dev)'s visual fee
 ## Features
 
 - 🎯 **Point-and-click annotations** — Click any element to add a numbered marker with a comment
-- 📷 **Element screenshots** — Capture individual annotated elements with an annotation header
-- 🖼️ **Full-page screenshots** — Capture the visible page with a summary of all annotations
-- ▦ **Grid screenshots** — Capture individual annotated elements arranged in a clean grid layout
+- 📷 **Element screenshots** — Capture individual annotated elements with an annotation header and white background
+- 🖼️ **Full-page screenshots** — Scroll-and-stitch capture that covers all annotated areas with a summary header
+- ▦ **Grid screenshots** — Scroll to each annotation, crop, and arrange in a 2-column masonry grid
 - 📋 **Copy feedback** — Export annotations as structured markdown (via Agentation)
 - 🔢 **Badge count** — See annotation count at a glance on the extension icon
 - 🔗 **No-server sharing** — Copy share text or a share URL to transfer annotations without a backend
@@ -41,8 +41,8 @@ npm run build
 2. Click on any page element to add an annotation marker
 3. Type your feedback in the popup that appears
 4. Use the 📷 button on any marker to screenshot that element
-5. Use **Screenshot Page** in the popup for a full-page capture with annotation summary
-6. Use **Screenshot Grid** in the popup to capture all visible annotated elements in a grid layout
+5. Use **Screenshot Page** in the popup for a scroll-and-stitch capture covering all annotations
+6. Use **Screenshot Grid** in the popup to capture all annotated elements in a masonry grid
 7. Use **Copy Share Text** to copy an encoded payload for chat/email sharing
 8. Use **Copy Share URL** to generate a URL hash link (best for smaller payloads)
 9. Use **Paste Shared Data** to import shared text/URL and choose **Replace** or **Merge**
@@ -75,6 +75,10 @@ src/
 └── shared/                        # Share payload + page key utilities
 ```
 
+## CSS Isolation
+
+AnnotateWeb injects a targeted CSS reset (font, line-height, text-transform, etc.) scoped to `#annotateweb-root` and `[class*="styles-module__"]` selectors. This prevents host-page CSS (Tailwind, Bootstrap, etc.) from breaking the toolbar and markers without interfering with Agentation's own styles.
+
 ## Maintenance & Compatibility
 
 ⚠️ **Important**: This extension relies on internal implementation details of the `agentation` library to provide features like "clean screenshots" and "grid capture".
@@ -82,8 +86,9 @@ src/
 If you update `agentation` in `package.json`, verify the following:
 
 1.  **CSS Selectors**: `screenshot.js` uses specific class name patterns (e.g., `styles-module__toolbar___`) to hide UI elements during capture. If Agentation changes its CSS modules, these screenshots will include UI artifacts.
-2.  **LocalStorage Schema**: The extension reads directly from `localStorage` keys starting with `feedback-annotations-`. If the data structure changes, badge counts and grid captures (which rely on `x`, `y`, `comment`, `number`) will break.
+2.  **LocalStorage Schema**: The extension reads directly from `localStorage` keys starting with `feedback-annotations-`. If the data structure changes, badge counts and screenshots (which rely on `x`, `y`, `comment`, `number`, `elementPath`) will break.
 3.  **Marker Positioning**: `injectTemporaryMarkers` duplicates Agentation's positioning logic (`top`/`left`). If Agentation switches to `transform` or other positioning methods, the temporary markers will be misaligned.
+4.  **Screenshot API Throttling**: `captureVisibleTab` is rate-limited to ~2 calls/sec by Chrome. The extension enforces a 550ms minimum interval between captures.
 
 ## License
 
