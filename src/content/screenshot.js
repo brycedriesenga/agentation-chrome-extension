@@ -442,8 +442,17 @@ function showToast(text, type = "success") {
 
 /**
  * Helper: request a screenshot of the currently visible tab from background.
+ * Throttled to avoid Chrome's MAX_CAPTURE_VISIBLE_TAB_CALLS_PER_SECOND quota.
  */
+let _lastCaptureTime = 0;
 async function requestCapture() {
+    const MIN_INTERVAL = 550; // Chrome allows ~2 calls/sec
+    const now = Date.now();
+    const elapsed = now - _lastCaptureTime;
+    if (elapsed < MIN_INTERVAL) {
+        await new Promise((r) => setTimeout(r, MIN_INTERVAL - elapsed));
+    }
+    _lastCaptureTime = Date.now();
     const response = await chrome.runtime.sendMessage({ type: "CAPTURE_SCREENSHOT" });
     if (response.error) throw new Error(response.error);
     return response.dataUrl;
@@ -452,14 +461,14 @@ async function requestCapture() {
 /**
  * Helper: small delay to let scroll settle before capture.
  */
-function scrollSettle(ms = 120) {
+function scrollSettle(ms = 80) {
     return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /**
- * Capture the full page using scroll-and-stitch.
- * Scrolls through the entire document in viewport-sized chunks,
- * captures each chunk, then sends all chunks to background for stitching
+ * Capture enough of the page to include all annotations using scroll-and-stitch.
+ * Only scrolls far enough to cover the lowest annotated element (not the full page).
+ * Captures viewport-sized chunks, then sends them to background for stitching
  * with an annotation summary header composited at the top.
  */
 export async function captureFullPage() {
@@ -474,12 +483,28 @@ export async function captureFullPage() {
     const dpr = window.devicePixelRatio || 1;
     const viewportHeight = window.innerHeight;
     const viewportWidth = window.innerWidth;
-    const fullHeight = Math.max(
+    const originalScrollX = window.scrollX;
+    const originalScrollY = window.scrollY;
+
+    // Calculate how far we need to scroll — just past the lowest annotation
+    let lowestBottom = 0;
+    annotations.forEach((annotation) => {
+        const el = resolveAnnotationElement(annotation);
+        if (!el) return;
+        const rect = el.getBoundingClientRect();
+        const absBottom = rect.bottom + window.scrollY;
+        if (absBottom > lowestBottom) lowestBottom = absBottom;
+    });
+
+    // Add some padding below the lowest annotation, clamp to document height
+    const docHeight = Math.max(
         document.body.scrollHeight,
         document.documentElement.scrollHeight
     );
-    const originalScrollX = window.scrollX;
-    const originalScrollY = window.scrollY;
+    const captureHeight = Math.min(
+        docHeight,
+        Math.max(viewportHeight, lowestBottom + 60) // at least one viewport
+    );
 
     // 1. Hide UI elements that shouldn't appear in capture
     const restoreFns = [];
@@ -527,11 +552,11 @@ export async function captureFullPage() {
     await nextFrame();
 
     try {
-        // 3. Scroll-and-capture in viewport-sized chunks
+        // 3. Scroll-and-capture in viewport-sized chunks (only up to captureHeight)
         const chunks = [];
         let scrollY = 0;
 
-        while (scrollY < fullHeight) {
+        while (scrollY < captureHeight) {
             window.scrollTo(0, scrollY);
             await scrollSettle();
             await nextFrame();
@@ -544,16 +569,12 @@ export async function captureFullPage() {
             });
 
             scrollY += viewportHeight;
-            // Avoid infinite loop if page doesn't scroll further
-            if (window.scrollY + viewportHeight >= fullHeight && chunks.length > 0 && scrollY > fullHeight) {
-                break;
-            }
         }
 
-        // Capture the last chunk if scroll didn't reach the bottom
+        // Capture the last chunk if we haven't covered captureHeight
         const lastChunkBottom = chunks[chunks.length - 1].scrollY + viewportHeight;
-        if (lastChunkBottom < fullHeight) {
-            window.scrollTo(0, fullHeight - viewportHeight);
+        if (lastChunkBottom < captureHeight) {
+            window.scrollTo(0, captureHeight - viewportHeight);
             await scrollSettle();
             await nextFrame();
             const lastCapture = await requestCapture();
@@ -574,7 +595,7 @@ export async function captureFullPage() {
             type: "STITCH_FULLPAGE_COMPOSITE",
             chunks,
             annotations: annotationItems,
-            pageHeight: fullHeight,
+            pageHeight: captureHeight,
             viewportHeight,
             viewportWidth,
             dpr,
