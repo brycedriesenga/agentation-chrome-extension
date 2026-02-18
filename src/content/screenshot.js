@@ -549,26 +549,27 @@ export async function captureAnnotationGrid() {
         const rect = el.getBoundingClientRect();
         if (rect.width === 0 || rect.height === 0) return;
 
-        if (
-            rect.bottom < 0 ||
-            rect.right < 0 ||
-            rect.top > window.innerHeight ||
-            rect.left > window.innerWidth
-        ) {
-            return;
-        }
-
+        // Clamp rect to the visible viewport so the crop stays within the captured screenshot
         const padding = 16;
+        const clampedLeft = Math.max(0, rect.left - padding);
+        const clampedTop = Math.max(0, rect.top - padding);
+        const clampedRight = Math.min(window.innerWidth, rect.right + padding);
+        const clampedBottom = Math.min(window.innerHeight, rect.bottom + padding);
+        const clampedWidth = clampedRight - clampedLeft;
+        const clampedHeight = clampedBottom - clampedTop;
+
+        if (clampedWidth <= 0 || clampedHeight <= 0) return;
+
         gridItems.push({
             annotation: {
                 number: String(i + 1),
                 comment: a.comment || '',
             },
             rect: {
-                x: Math.max(0, rect.left - padding),
-                y: Math.max(0, rect.top - padding),
-                width: rect.width + padding * 2,
-                height: rect.height + padding * 2,
+                x: clampedLeft,
+                y: clampedTop,
+                width: clampedWidth,
+                height: clampedHeight,
                 dpr: dpr
             }
         });

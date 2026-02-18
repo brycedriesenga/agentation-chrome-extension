@@ -55,12 +55,36 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 async function handleToggle(tabId, sendResponse) {
     try {
         if (activeTabs.has(tabId)) {
-            await chrome.tabs.sendMessage(tabId, { type: "DEACTIVATE" });
+            try {
+                await chrome.tabs.sendMessage(tabId, { type: "DEACTIVATE" });
+            } catch { /* content script may already be gone */ }
             activeTabs.delete(tabId);
             await chrome.action.setBadgeText({ text: "", tabId });
             sendResponse({ active: false });
         } else {
-            await chrome.tabs.sendMessage(tabId, { type: "ACTIVATE" });
+            // Try sending ACTIVATE; if the content script isn't loaded yet,
+            // inject it programmatically and retry.
+            try {
+                await chrome.tabs.sendMessage(tabId, { type: "ACTIVATE" });
+            } catch {
+                // Content script not loaded — inject it dynamically
+                const manifest = chrome.runtime.getManifest();
+                const contentScriptFiles = manifest.content_scripts?.[0]?.js || [];
+                if (contentScriptFiles.length > 0) {
+                    await chrome.scripting.executeScript({
+                        target: { tabId },
+                        files: contentScriptFiles,
+                    });
+                    // Wait for it to mount
+                    await new Promise((r) => setTimeout(r, 600));
+                }
+                // Retry
+                try {
+                    await chrome.tabs.sendMessage(tabId, { type: "ACTIVATE" });
+                } catch (retryErr) {
+                    console.warn("AnnotateWeb: retry sendMessage failed", retryErr);
+                }
+            }
             activeTabs.add(tabId);
             sendResponse({ active: true });
         }

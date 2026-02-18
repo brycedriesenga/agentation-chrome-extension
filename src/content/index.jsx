@@ -151,7 +151,13 @@ function AnnotateWebApp() {
             onAnnotationAdd={() => updateBadgeCount()}
             onAnnotationDelete={() => updateBadgeCount()}
             onAnnotationUpdate={() => updateBadgeCount()}
-            onAnnotationsClear={() => updateBadgeCount()}
+            onAnnotationsClear={() => {
+                // Clear resets count to 0 — no need to read from localStorage
+                chrome.runtime.sendMessage({
+                    type: "ANNOTATION_COUNT",
+                    count: 0,
+                });
+            }}
         />
     );
 }
