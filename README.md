@@ -12,7 +12,7 @@ A Chrome extension that brings [Agentation](https://agentation.dev)'s visual fee
 - 🔢 **Badge count** — See annotation count at a glance on the extension icon
 - 🔗 **No-server sharing** — Copy share text or a share URL to transfer annotations without a backend
 - 📥 **Import modes** — Paste shared data and choose Replace or Merge import behavior with merge summaries
-- 🎨 **Theme-aware controls** — Popup and in-page share/screenshot affordances adapt to Agentation light/dark mode
+- 🎨 **Theme-aware controls** — Popup keeps its classic dark visual style while SVG/icon accents and in-page affordances adapt to Agentation light/dark mode
 - ⌨️ **Keyboard shortcut** — `Ctrl+Shift+.` to toggle annotations
 
 ## Getting Started
