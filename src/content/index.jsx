@@ -11,6 +11,23 @@ import { maybeImportFromHash } from "./share-sync.js";
 const messageRouter = createMessageRouter({ captureFullPage, captureAnnotationGrid });
 chrome.runtime.onMessage.addListener(messageRouter);
 
+
+function openFeedbackModeWithRetry() {
+    const tryOpen = (attempt = 0) => {
+        const startButton = document.querySelector('button[title="Start feedback mode"]');
+        if (startButton) {
+            startButton.click();
+            return;
+        }
+
+        if (attempt < 12) {
+            setTimeout(() => tryOpen(attempt + 1), 120);
+        }
+    };
+
+    setTimeout(() => tryOpen(), 60);
+}
+
 function AnnotateWebApp() {
     const [active, setActive] = useState(false);
     const [renderVersion, setRenderVersion] = useState(0);
@@ -30,6 +47,7 @@ function AnnotateWebApp() {
         const messageHandler = (message) => {
             if (message.type === "ACTIVATE") {
                 setActive(true);
+                openFeedbackModeWithRetry();
             } else if (message.type === "DEACTIVATE") {
                 setActive(false);
             }
@@ -55,6 +73,12 @@ function AnnotateWebApp() {
         };
         window.addEventListener("message", postMessageHandler);
 
+        const openFeedbackHandler = () => {
+            setActive(true);
+            openFeedbackModeWithRetry();
+        };
+        window.addEventListener("ANNOTATEWEB_OPEN_FEEDBACK", openFeedbackHandler);
+
         const refreshHandler = () => {
             setRenderVersion((value) => value + 1);
             updateBadgeCount();
@@ -65,6 +89,7 @@ function AnnotateWebApp() {
             chrome.runtime.onMessage.removeListener(messageHandler);
             document.removeEventListener("keydown", keyHandler);
             window.removeEventListener("message", postMessageHandler);
+            window.removeEventListener("ANNOTATEWEB_OPEN_FEEDBACK", openFeedbackHandler);
             window.removeEventListener("ANNOTATEWEB_REFRESH", refreshHandler);
         };
     }, [updateBadgeCount]);
@@ -74,6 +99,7 @@ function AnnotateWebApp() {
 
         const timer = setTimeout(() => {
             initScreenshotButtons();
+            openFeedbackModeWithRetry();
         }, 500);
 
         observerRef.current = new MutationObserver(() => {

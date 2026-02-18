@@ -267,8 +267,8 @@ async function captureAnnotatedElement(marker) {
         }
 
         // Copy to clipboard
-        await copyImageToClipboard(response.dataUrl);
-        showToast("Screenshot copied to clipboard!", "success");
+        const copied = await copyImageToClipboard(response.dataUrl);
+        showToast(copied ? "Screenshot copied to clipboard!" : "Screenshot ready, but clipboard access was blocked.", copied ? "success" : "error");
     } catch (err) {
         // Restore even on error
         restoreFns.forEach((fn) => fn());
@@ -281,36 +281,49 @@ async function captureAnnotatedElement(marker) {
  * Copy a data URL image to the clipboard.
  * Focuses the window first to avoid NotAllowedError when triggered from popup.
  */
+function delay(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function ensureDocumentFocus() {
+    const waits = [0, 120, 280, 420];
+    for (const wait of waits) {
+        window.focus();
+        if (wait > 0) {
+            await delay(wait);
+        }
+        if (document.hasFocus()) {
+            return true;
+        }
+    }
+    return false;
+}
+
 async function copyImageToClipboard(dataUrl) {
     const response = await fetch(dataUrl);
     const blob = await response.blob();
 
-    // Focus the page window — the clipboard API requires document focus
-    window.focus();
+    await ensureDocumentFocus();
 
-    // Small delay to let focus settle
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    const item = new ClipboardItem({
+        [blob.type]: blob,
+    });
 
-    try {
-        await navigator.clipboard.write([
-            new ClipboardItem({
-                [blob.type]: blob,
-            }),
-        ]);
-    } catch (err) {
-        // Retry once after a longer focus delay
-        if (err.name === 'NotAllowedError') {
-            window.focus();
-            await new Promise((resolve) => setTimeout(resolve, 300));
-            await navigator.clipboard.write([
-                new ClipboardItem({
-                    [blob.type]: blob,
-                }),
-            ]);
-        } else {
-            throw err;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+        try {
+            await navigator.clipboard.write([item]);
+            return true;
+        } catch (err) {
+            if (err.name !== "NotAllowedError") {
+                throw err;
+            }
+
+            await ensureDocumentFocus();
+            await delay(180 + attempt * 160);
         }
     }
+
+    return false;
 }
 
 /**
@@ -469,8 +482,8 @@ export async function captureFullPage() {
             return null;
         }
 
-        await copyImageToClipboard(response.dataUrl);
-        showToast("Full page screenshot copied!", "success");
+        const copied = await copyImageToClipboard(response.dataUrl);
+        showToast(copied ? "Full page screenshot copied!" : "Full page screenshot ready, but clipboard access was blocked.", copied ? "success" : "error");
         return response.dataUrl;
     } catch (err) {
         highlightOverlays.forEach((el) => el.remove());
@@ -563,8 +576,8 @@ export async function captureAnnotationGrid() {
             return;
         }
 
-        await copyImageToClipboard(response.dataUrl);
-        showToast("Grid screenshot copied!", "success");
+        const copied = await copyImageToClipboard(response.dataUrl);
+        showToast(copied ? "Grid screenshot copied!" : "Grid screenshot ready, but clipboard access was blocked.", copied ? "success" : "error");
     } catch (err) {
         restoreFns.forEach((fn) => fn());
         console.error("Grid screenshot error:", err);

@@ -47,6 +47,7 @@ npm run build
 8. Use **Copy Share URL** to generate a URL hash link (best for smaller payloads)
 9. Use **Paste Shared Data** to import shared text/URL and choose **Replace** or **Merge**
 10. Imports refresh in-page annotations automatically (no manual reload needed)
+11. Toolbar auto-opens feedback mode when toggling on annotations or importing shared annotations
 
 Screenshots are automatically copied to clipboard.
 

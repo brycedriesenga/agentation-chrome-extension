@@ -89,3 +89,6 @@ Load `dist/` as unpacked extension in `chrome://extensions`.
 
 - Added popup sharing controls now fully switch between Agentation-aligned dark/light styling, while SVG/icon colors and on-page screenshot/share affordances follow the active theme via `feedback-toolbar-theme` (with toolbar/style detection fallback).
 - If Agentation theme cannot be detected (e.g., toolbar closed), fallback uses system `prefers-color-scheme`.
+
+- Screenshot actions triggered from popup close the popup immediately to restore page focus before clipboard writes.
+- Annotation toggle and share imports trigger auto-open feedback mode (`Start feedback mode`) for faster workflows.

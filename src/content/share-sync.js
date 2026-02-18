@@ -67,6 +67,7 @@ export async function importSharePayload(payload, mode = "replace") {
     writeAnnotations(finalAnnotations);
     emitAnnotationCount();
     requestAnnotationRefresh();
+    window.dispatchEvent(new CustomEvent("ANNOTATEWEB_OPEN_FEEDBACK"));
 
     return {
         ok: true,

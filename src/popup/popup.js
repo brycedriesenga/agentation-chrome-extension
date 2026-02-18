@@ -43,6 +43,10 @@ function setStatus(message, type = "info") {
     statusMessage.className = `status-message${type === "error" ? " error" : ""}`;
 }
 
+function closePopupForFocusSensitiveAction() {
+    setTimeout(() => window.close(), 30);
+}
+
 function withButtonFeedback(button, text) {
     const label = button.querySelector("span:last-child");
     const original = label.textContent;
@@ -117,16 +121,19 @@ async function init() {
             tabId: tab.id,
         });
         updateUI(result.active);
+        if (result.active) {
+            await chrome.tabs.sendMessage(tab.id, { type: "OPEN_FEEDBACK_MODE" });
+        }
     });
 
-    screenshotBtn.addEventListener("click", async () => {
-        await chrome.tabs.sendMessage(tab.id, { type: "SCREENSHOT_FULL_PAGE" });
-        withButtonFeedback(screenshotBtn, "Captured!");
+    screenshotBtn.addEventListener("click", () => {
+        closePopupForFocusSensitiveAction();
+        chrome.tabs.sendMessage(tab.id, { type: "SCREENSHOT_FULL_PAGE" }).catch(() => {});
     });
 
-    gridScreenshotBtn.addEventListener("click", async () => {
-        await chrome.tabs.sendMessage(tab.id, { type: "SCREENSHOT_GRID" });
-        withButtonFeedback(gridScreenshotBtn, "Captured!");
+    gridScreenshotBtn.addEventListener("click", () => {
+        closePopupForFocusSensitiveAction();
+        chrome.tabs.sendMessage(tab.id, { type: "SCREENSHOT_GRID" }).catch(() => {});
     });
 
     copyShareTextBtn.addEventListener("click", async () => {
@@ -205,6 +212,7 @@ async function init() {
                 throw new Error(importResponse?.error || "Import failed.");
             }
 
+            await chrome.tabs.sendMessage(tab.id, { type: "OPEN_FEEDBACK_MODE" });
             setStatus(getSummaryText(importResponse.summary));
             sharePanel.hidden = true;
             shareInput.value = "";

@@ -23,6 +23,12 @@ export function createMessageRouter({ captureFullPage, captureAnnotationGrid }) 
             return false;
         }
 
+        if (message.type === "OPEN_FEEDBACK_MODE") {
+            window.dispatchEvent(new CustomEvent("ANNOTATEWEB_OPEN_FEEDBACK"));
+            sendResponse({ ok: true });
+            return false;
+        }
+
         if (message.type === "IMPORT_SHARE_DATA") {
             importSharePayload(message.payload, message.mode)
                 .then((result) => sendResponse(result))
