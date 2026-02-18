@@ -180,6 +180,25 @@ function mount() {
 
     const styleEl = document.createElement("style");
     styleEl.textContent = `
+      /* ── CSS Isolation: revert ALL inherited host-page styles ─────── */
+      /* Agentation toolbar, markers, popups, highlights, overlays */
+      [data-feedback-toolbar],
+      [data-feedback-toolbar] *,
+      [data-annotation-marker],
+      [data-annotation-marker] *,
+      [class*="styles-module__"],
+      [class*="styles-module__"] * {
+        all: revert !important;
+      }
+
+      /* Re-apply critical layout properties that 'all: revert' may undo */
+      [data-feedback-toolbar] *,
+      [data-annotation-marker] *,
+      [class*="styles-module__"] * {
+        box-sizing: border-box !important;
+      }
+
+      /* ── Agentation component-specific fixes ───────────────────────── */
       [class*="styles-module__settingsPanel___"] {
         min-width: 230px !important;
         box-sizing: border-box !important;
