@@ -3,6 +3,7 @@
 // Handles clean captures by hiding overlays and compositing annotation headers
 
 import { loadAnnotations } from "agentation";
+import { getThemePalette } from "./theme.js";
 
 /**
  * Selectors for Agentation UI elements that should be hidden during captures.
@@ -52,6 +53,7 @@ function nextFrame() {
  */
 function injectTemporaryMarkers(annotations) {
     const markers = [];
+    const palette = getThemePalette();
     annotations.forEach((a, i) => {
         // Skip if invalid coords
         if (typeof a.x !== 'number' || typeof a.y !== 'number') return;
@@ -65,8 +67,8 @@ function injectTemporaryMarkers(annotations) {
             top: ${a.y}px;
             width: 24px;
             height: 24px;
-            background-color: #6366f1; /* Indigo-500 matching default */
-            color: white;
+            background-color: ${palette.markerBg};
+            color: ${palette.markerText};
             border-radius: 50%;
             display: flex;
             align-items: center;
@@ -74,7 +76,7 @@ function injectTemporaryMarkers(annotations) {
             font-size: 12px;
             font-weight: 600;
             font-family: system-ui, sans-serif;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            box-shadow: ${palette.markerShadow};
             z-index: 2147483645; /* Above highlights (ending in 40) */
             pointer-events: none;
             transform: translate(-50%, -50%); /* Agentation centers on point */
@@ -85,12 +87,53 @@ function injectTemporaryMarkers(annotations) {
     return markers;
 }
 
+
+function isIgnoredCaptureElement(el) {
+    if (!el) return true;
+    return Boolean(
+        el.closest('[data-feedback-toolbar]') ||
+        el.closest('[data-annotation-marker]') ||
+        el.closest('.annotateweb-screenshot-btn') ||
+        el.closest('#annotateweb-root')
+    );
+}
+
+function resolveAnnotationElement(annotation) {
+    if (annotation?.elementPath) {
+        try {
+            const byPath = document.querySelector(annotation.elementPath);
+            if (byPath) return byPath;
+        } catch {
+            // ignore invalid selector; try coordinate fallback
+        }
+    }
+
+    if (typeof annotation?.x !== 'number' || typeof annotation?.y !== 'number') {
+        return null;
+    }
+
+    const viewportX = Math.round((annotation.x / 100) * window.innerWidth);
+    const viewportY = Math.round(annotation.isFixed ? annotation.y : annotation.y - window.scrollY);
+
+    if (viewportX < 0 || viewportY < 0 || viewportX > window.innerWidth || viewportY > window.innerHeight) {
+        return null;
+    }
+
+    const hit = document.elementFromPoint(viewportX, viewportY);
+    if (!hit || isIgnoredCaptureElement(hit)) {
+        return null;
+    }
+
+    return hit;
+}
+
 /**
  * Initialize screenshot buttons on annotation markers.
  * Called after Agentation renders markers, and re-called on DOM mutations.
  */
 export function initScreenshotButtons() {
     const markers = document.querySelectorAll('[data-annotation-marker]');
+    const palette = getThemePalette();
 
     markers.forEach((marker) => {
         // Skip if already enhanced
@@ -100,7 +143,7 @@ export function initScreenshotButtons() {
         // Add a screenshot button next to/inside the marker on hover
         const btn = document.createElement("button");
         btn.className = "annotateweb-screenshot-btn";
-        btn.innerHTML = `<svg width="12" height="10" viewBox="0 0 24 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M23 17C23 17.5304 22.7893 18.0391 22.4142 18.4142C22.0391 18.7893 21.5304 19 21 19H3C2.46957 19 1.96086 18.7893 1.58579 18.4142C1.21071 18.0391 1 17.5304 1 17V6C1 5.46957 1.21071 4.96086 1.58579 4.58579C1.96086 4.21071 2.46957 4 3 4H7L9 1H15L17 4H21C21.5304 4 22.0391 4.21071 22.4142 4.58579C22.7893 4.96086 23 5.46957 23 6V17Z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 15C14.2091 15 16 13.2091 16 11C16 8.79086 14.2091 7 12 7C9.79086 7 8 8.79086 8 11C8 13.2091 9.79086 15 12 15Z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+        btn.innerHTML = `<svg width="12" height="10" viewBox="0 0 24 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M23 17C23 17.5304 22.7893 18.0391 22.4142 18.4142C22.0391 18.7893 21.5304 19 21 19H3C2.46957 19 1.96086 18.7893 1.58579 18.4142C1.21071 18.0391 1 17.5304 1 17V6C1 5.46957 1.21071 4.96086 1.58579 4.58579C1.96086 4.21071 2.46957 4 3 4H7L9 1H15L17 4H21C21.5304 4 22.0391 4.21071 22.4142 4.58579C22.7893 4.96086 23 5.46957 23 6V17Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 15C14.2091 15 16 13.2091 16 11C16 8.79086 14.2091 7 12 7C9.79086 7 8 8.79086 8 11C8 13.2091 9.79086 15 12 15Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
         btn.title = "Screenshot this element";
         btn.style.cssText = `
       position: absolute;
@@ -109,10 +152,10 @@ export function initScreenshotButtons() {
       width: 20px;
       height: 20px;
       border-radius: 50%;
-      border: 1px solid rgba(255,255,255,0.3);
-      background: rgba(30, 30, 40, 0.9);
+      border: 1px solid ${palette.buttonBorder};
+      background: ${palette.buttonBg};
       backdrop-filter: blur(8px);
-      color: white;
+      color: ${palette.buttonColor};
       font-size: 10px;
       cursor: pointer;
       display: flex;
@@ -235,6 +278,8 @@ async function captureAnnotatedElement(marker) {
     restoreFns.push(hideElements(AGENTATION_SELECTORS.toolbar));
     restoreFns.push(hideElements(AGENTATION_SELECTORS.highlights));
     restoreFns.push(hideElements(AGENTATION_SELECTORS.highlightsContainer));
+    restoreFns.push(hideElements(AGENTATION_SELECTORS.hoverHighlight));
+    restoreFns.push(hideElements(AGENTATION_SELECTORS.hoverTooltip));
     restoreFns.push(hideElements(AGENTATION_SELECTORS.markerTooltips));
     restoreFns.push(hideElements(AGENTATION_SELECTORS.markers));
     restoreFns.push(hideElements(AGENTATION_SELECTORS.overlay));
@@ -264,8 +309,8 @@ async function captureAnnotatedElement(marker) {
         }
 
         // Copy to clipboard
-        await copyImageToClipboard(response.dataUrl);
-        showToast("Screenshot copied to clipboard!", "success");
+        const copied = await copyImageToClipboard(response.dataUrl);
+        showToast(copied ? "Screenshot copied to clipboard!" : "Screenshot ready, but clipboard access was blocked.", copied ? "success" : "error");
     } catch (err) {
         // Restore even on error
         restoreFns.forEach((fn) => fn());
@@ -278,36 +323,49 @@ async function captureAnnotatedElement(marker) {
  * Copy a data URL image to the clipboard.
  * Focuses the window first to avoid NotAllowedError when triggered from popup.
  */
+function delay(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function ensureDocumentFocus() {
+    const waits = [0, 120, 280, 420];
+    for (const wait of waits) {
+        window.focus();
+        if (wait > 0) {
+            await delay(wait);
+        }
+        if (document.hasFocus()) {
+            return true;
+        }
+    }
+    return false;
+}
+
 async function copyImageToClipboard(dataUrl) {
     const response = await fetch(dataUrl);
     const blob = await response.blob();
 
-    // Focus the page window — the clipboard API requires document focus
-    window.focus();
+    await ensureDocumentFocus();
 
-    // Small delay to let focus settle
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    const item = new ClipboardItem({
+        [blob.type]: blob,
+    });
 
-    try {
-        await navigator.clipboard.write([
-            new ClipboardItem({
-                [blob.type]: blob,
-            }),
-        ]);
-    } catch (err) {
-        // Retry once after a longer focus delay
-        if (err.name === 'NotAllowedError') {
-            window.focus();
-            await new Promise((resolve) => setTimeout(resolve, 300));
-            await navigator.clipboard.write([
-                new ClipboardItem({
-                    [blob.type]: blob,
-                }),
-            ]);
-        } else {
-            throw err;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+        try {
+            await navigator.clipboard.write([item]);
+            return true;
+        } catch (err) {
+            if (err.name !== "NotAllowedError") {
+                throw err;
+            }
+
+            await ensureDocumentFocus();
+            await delay(180 + attempt * 160);
         }
     }
+
+    return false;
 }
 
 /**
@@ -385,13 +443,38 @@ function showToast(text, type = "success") {
 }
 
 /**
- * Capture the full visible page with annotation markers visible
- * and an annotation summary header composited at the top.
- * Uses loadAnnotations to get annotation data cleanly from localStorage.
- * Injects temporary highlight borders around annotated elements.
+ * Helper: request a screenshot of the currently visible tab from background.
+ * Throttled to avoid Chrome's MAX_CAPTURE_VISIBLE_TAB_CALLS_PER_SECOND quota.
+ */
+let _lastCaptureTime = 0;
+async function requestCapture() {
+    const MIN_INTERVAL = 550; // Chrome allows ~2 calls/sec
+    const now = Date.now();
+    const elapsed = now - _lastCaptureTime;
+    if (elapsed < MIN_INTERVAL) {
+        await new Promise((r) => setTimeout(r, MIN_INTERVAL - elapsed));
+    }
+    _lastCaptureTime = Date.now();
+    const response = await chrome.runtime.sendMessage({ type: "CAPTURE_SCREENSHOT" });
+    if (response.error) throw new Error(response.error);
+    return response.dataUrl;
+}
+
+/**
+ * Helper: small delay to let scroll settle before capture.
+ */
+function scrollSettle(ms = 80) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Capture enough of the page to include all annotations using scroll-and-stitch.
+ * Only scrolls far enough to cover the lowest annotated element (not the full page).
+ * Captures viewport-sized chunks, then sends them to background for stitching
+ * with an annotation summary header composited at the top.
  */
 export async function captureFullPage() {
-    // 1. Get all annotation data from Agentation's localStorage
+    const palette = getThemePalette();
     const annotations = getAllAnnotations();
     const annotationItems = annotations.map((a, i) => ({
         number: String(i + 1),
@@ -399,7 +482,33 @@ export async function captureFullPage() {
         element: a.element || '',
     }));
 
-    // 2. Hide toolbar, settings panel, screenshot buttons, hover elements
+    const dpr = window.devicePixelRatio || 1;
+    const viewportHeight = window.innerHeight;
+    const viewportWidth = window.innerWidth;
+    const originalScrollX = window.scrollX;
+    const originalScrollY = window.scrollY;
+
+    // Calculate how far we need to scroll — just past the lowest annotation
+    let lowestBottom = 0;
+    annotations.forEach((annotation) => {
+        const el = resolveAnnotationElement(annotation);
+        if (!el) return;
+        const rect = el.getBoundingClientRect();
+        const absBottom = rect.bottom + window.scrollY;
+        if (absBottom > lowestBottom) lowestBottom = absBottom;
+    });
+
+    // Add some padding below the lowest annotation, clamp to document height
+    const docHeight = Math.max(
+        document.body.scrollHeight,
+        document.documentElement.scrollHeight
+    );
+    const captureHeight = Math.min(
+        docHeight,
+        Math.max(viewportHeight, lowestBottom + 60) // at least one viewport
+    );
+
+    // 1. Hide UI elements that shouldn't appear in capture
     const restoreFns = [];
     restoreFns.push(hideElements(AGENTATION_SELECTORS.toolbar));
     restoreFns.push(hideElements(AGENTATION_SELECTORS.settingsPanel));
@@ -407,68 +516,103 @@ export async function captureFullPage() {
     restoreFns.push(hideElements(AGENTATION_SELECTORS.hoverHighlight));
     restoreFns.push(hideElements(AGENTATION_SELECTORS.hoverTooltip));
     restoreFns.push(hideElements(AGENTATION_SELECTORS.markerTooltips));
-    // Also hide real markers to avoid duplication/ghosting if they are present
     restoreFns.push(hideElements(AGENTATION_SELECTORS.markers));
+    restoreFns.push(hideElements('#annotateweb-root'));
 
-    // 3. Inject temporary highlight borders around annotated elements
+    // 2. Inject temporary markers and highlights
     const highlightOverlays = [];
     annotations.forEach((annotation) => {
-        if (!annotation.elementPath) return;
-        try {
-            const el = document.querySelector(annotation.elementPath);
-            if (!el) return;
-            const rect = el.getBoundingClientRect();
-            if (rect.width === 0 || rect.height === 0) return;
+        const el = resolveAnnotationElement(annotation);
+        if (!el) return;
 
-            const overlay = document.createElement('div');
-            overlay.className = 'annotateweb-highlight-overlay';
-            overlay.style.cssText = `
-                position: fixed;
-                top: ${rect.top - 2}px;
-                left: ${rect.left - 2}px;
-                width: ${rect.width + 4}px;
-                height: ${rect.height + 4}px;
-                border: 2px solid rgba(99, 102, 241, 0.6);
-                border-radius: 6px;
-                background: rgba(99, 102, 241, 0.06);
-                pointer-events: none;
-                z-index: 2147483640;
-                box-sizing: border-box;
-            `;
-            document.body.appendChild(overlay);
-            highlightOverlays.push(overlay);
-        } catch {
-            // Invalid selector or element not found — skip
-        }
+        const rect = el.getBoundingClientRect();
+        const absTop = rect.top + window.scrollY;
+        const absLeft = rect.left + window.scrollX;
+        if (rect.width === 0 || rect.height === 0) return;
+
+        const overlay = document.createElement('div');
+        overlay.className = 'annotateweb-highlight-overlay';
+        overlay.style.cssText = `
+            position: absolute;
+            top: ${absTop - 2}px;
+            left: ${absLeft - 2}px;
+            width: ${rect.width + 4}px;
+            height: ${rect.height + 4}px;
+            border: 2px solid ${palette.highlightBorder};
+            border-radius: 6px;
+            background: ${palette.highlightBg};
+            pointer-events: none;
+            z-index: 2147483640;
+            box-sizing: border-box;
+        `;
+        document.body.appendChild(overlay);
+        highlightOverlays.push(overlay);
     });
 
-    // 4. Inject temporary markers (ensures visibility even if toolbar closed)
     const tempMarkers = injectTemporaryMarkers(annotations);
 
-    // 5. Wait for DOM to settle
     await nextFrame();
 
     try {
-        // 6. Capture the page (markers + highlights visible)
-        const response = await chrome.runtime.sendMessage({
-            type: "CAPTURE_FULLPAGE_COMPOSITE",
-            annotations: annotationItems,
-        });
+        // 3. Scroll-and-capture in viewport-sized chunks (only up to captureHeight)
+        const chunks = [];
+        let scrollY = 0;
 
-        // 7. Remove temporary elements and restore hidden elements
+        while (scrollY < captureHeight) {
+            window.scrollTo(0, scrollY);
+            await scrollSettle();
+            await nextFrame();
+
+            const capturedDataUrl = await requestCapture();
+            const actualScroll = window.scrollY;
+            chunks.push({
+                dataUrl: capturedDataUrl,
+                scrollY: actualScroll,
+            });
+
+            scrollY += viewportHeight;
+        }
+
+        // Capture the last chunk if we haven't covered captureHeight
+        const lastChunkBottom = chunks[chunks.length - 1].scrollY + viewportHeight;
+        if (lastChunkBottom < captureHeight) {
+            window.scrollTo(0, captureHeight - viewportHeight);
+            await scrollSettle();
+            await nextFrame();
+            const lastCapture = await requestCapture();
+            chunks.push({
+                dataUrl: lastCapture,
+                scrollY: window.scrollY,
+            });
+        }
+
+        // 4. Restore scroll and UI
+        window.scrollTo(originalScrollX, originalScrollY);
         highlightOverlays.forEach((el) => el.remove());
         tempMarkers.forEach((el) => el.remove());
         restoreFns.forEach((fn) => fn());
+
+        // 5. Send chunks to background for stitching + header compositing
+        const response = await chrome.runtime.sendMessage({
+            type: "STITCH_FULLPAGE_COMPOSITE",
+            chunks,
+            annotations: annotationItems,
+            pageHeight: captureHeight,
+            viewportHeight,
+            viewportWidth,
+            dpr,
+        });
 
         if (response.error) {
             showToast("Full page screenshot failed", "error");
             return null;
         }
 
-        await copyImageToClipboard(response.dataUrl);
-        showToast("Full page screenshot copied!", "success");
+        const copied = await copyImageToClipboard(response.dataUrl);
+        showToast(copied ? "Full page screenshot copied!" : "Full page screenshot ready, but clipboard access was blocked.", copied ? "success" : "error");
         return response.dataUrl;
     } catch (err) {
+        window.scrollTo(originalScrollX, originalScrollY);
         highlightOverlays.forEach((el) => el.remove());
         tempMarkers.forEach((el) => el.remove());
         restoreFns.forEach((fn) => fn());
@@ -479,60 +623,53 @@ export async function captureFullPage() {
 }
 
 /**
- * Capture each annotated element individually and composite them into a grid.
+ * Capture each annotated element individually using scroll-and-stitch,
+ * then composite them into a grid.
+ * Scrolls to each annotation element, captures it, and sends all
+ * individual captures to the background for grid compositing.
  */
 export async function captureAnnotationGrid() {
     const annotations = getAllAnnotations();
-
-    // 1. Gather visible rects for each annotation
-    // We filter to only those elements that are currently in the DOM and visible
-    const gridItems = [];
     const dpr = window.devicePixelRatio || 1;
+    const viewportHeight = window.innerHeight;
+    const viewportWidth = window.innerWidth;
+    const originalScrollX = window.scrollX;
+    const originalScrollY = window.scrollY;
 
+    // 1. Collect absolute positions for all annotation elements
+    const annotationElements = [];
     annotations.forEach((a, i) => {
-        if (!a.elementPath) return;
-        try {
-            const el = document.querySelector(a.elementPath);
-            if (!el) return;
-            const rect = el.getBoundingClientRect();
-            if (rect.width === 0 || rect.height === 0) return;
+        const el = resolveAnnotationElement(a);
+        if (!el) return;
 
-            // Check if roughly visible in viewport (simple check)
-            if (
-                rect.bottom < 0 ||
-                rect.right < 0 ||
-                rect.top > window.innerHeight ||
-                rect.left > window.innerWidth
-            ) {
-                return;
+        const rect = el.getBoundingClientRect();
+        if (rect.width === 0 || rect.height === 0) return;
+
+        // Store absolute (page-relative) position
+        const absTop = rect.top + window.scrollY;
+        const absLeft = rect.left + window.scrollX;
+
+        annotationElements.push({
+            el,
+            annotation: {
+                number: String(i + 1),
+                comment: a.comment || '',
+            },
+            absRect: {
+                top: absTop,
+                left: absLeft,
+                width: rect.width,
+                height: rect.height,
             }
-
-            // Add padding
-            const padding = 16;
-            gridItems.push({
-                annotation: {
-                    number: String(i + 1),
-                    comment: a.comment || '',
-                },
-                rect: {
-                    x: Math.max(0, rect.left - padding),
-                    y: Math.max(0, rect.top - padding),
-                    width: rect.width + padding * 2,
-                    height: rect.height + padding * 2,
-                    dpr: dpr
-                }
-            });
-        } catch {
-            // Element not found
-        }
+        });
     });
 
-    if (gridItems.length === 0) {
-        showToast("No visible annotated elements found", "error");
+    if (annotationElements.length === 0) {
+        showToast("No annotated elements found", "error");
         return;
     }
 
-    // 2. Hide everything to get clean captures
+    // 2. Hide all Agentation UI
     const restoreFns = [];
     restoreFns.push(hideElements(AGENTATION_SELECTORS.toolbar));
     restoreFns.push(hideElements(AGENTATION_SELECTORS.settingsPanel));
@@ -545,23 +682,65 @@ export async function captureAnnotationGrid() {
     await nextFrame();
 
     try {
-        // 3. Send to background for processing
-        // We capture the whole tab once, then background crops each item
-        const response = await chrome.runtime.sendMessage({
-            type: "CAPTURE_GRID_COMPOSITE",
-            items: gridItems
-        });
+        // 3. For each annotation, scroll to it, capture, and crop
+        const gridItems = [];
 
+        for (const item of annotationElements) {
+            const { absRect, annotation } = item;
+            const padding = 16;
+
+            // Scroll so the element is centered in the viewport
+            const targetScrollY = Math.max(0, absRect.top - viewportHeight / 2 + absRect.height / 2);
+            window.scrollTo(0, targetScrollY);
+            await scrollSettle();
+            await nextFrame();
+
+            // Capture the visible tab
+            const capturedDataUrl = await requestCapture();
+
+            // Calculate the element's position within this captured viewport
+            const actualScroll = window.scrollY;
+            const vpTop = absRect.top - actualScroll;
+            const vpLeft = absRect.left;
+
+            // Clamp to viewport
+            const cropLeft = Math.max(0, vpLeft - padding);
+            const cropTop = Math.max(0, vpTop - padding);
+            const cropRight = Math.min(viewportWidth, vpLeft + absRect.width + padding);
+            const cropBottom = Math.min(viewportHeight, vpTop + absRect.height + padding);
+
+            gridItems.push({
+                dataUrl: capturedDataUrl,
+                annotation,
+                rect: {
+                    x: cropLeft,
+                    y: cropTop,
+                    width: cropRight - cropLeft,
+                    height: cropBottom - cropTop,
+                    dpr,
+                }
+            });
+        }
+
+        // 4. Restore scroll and UI
+        window.scrollTo(originalScrollX, originalScrollY);
         restoreFns.forEach((fn) => fn());
+
+        // 5. Send individual captures to background for grid compositing
+        const response = await chrome.runtime.sendMessage({
+            type: "STITCH_GRID_COMPOSITE",
+            items: gridItems,
+        });
 
         if (response.error) {
             showToast("Grid screenshot failed", "error");
             return;
         }
 
-        await copyImageToClipboard(response.dataUrl);
-        showToast("Grid screenshot copied!", "success");
+        const copied = await copyImageToClipboard(response.dataUrl);
+        showToast(copied ? "Grid screenshot copied!" : "Grid screenshot ready, but clipboard access was blocked.", copied ? "success" : "error");
     } catch (err) {
+        window.scrollTo(originalScrollX, originalScrollY);
         restoreFns.forEach((fn) => fn());
         console.error("Grid screenshot error:", err);
         showToast("Grid screenshot failed", "error");

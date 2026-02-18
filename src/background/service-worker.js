@@ -45,6 +45,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             );
             return true; // async response
 
+        case "STITCH_FULLPAGE_COMPOSITE":
+            handleStitchFullpage(message, sendResponse);
+            return true;
+
+        case "STITCH_GRID_COMPOSITE":
+            handleStitchGrid(message, sendResponse);
+            return true;
+
         case "ANNOTATION_COUNT":
             updateBadge(sender.tab.id, message.count);
             return false;
@@ -55,12 +63,36 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 async function handleToggle(tabId, sendResponse) {
     try {
         if (activeTabs.has(tabId)) {
-            await chrome.tabs.sendMessage(tabId, { type: "DEACTIVATE" });
+            try {
+                await chrome.tabs.sendMessage(tabId, { type: "DEACTIVATE" });
+            } catch { /* content script may already be gone */ }
             activeTabs.delete(tabId);
             await chrome.action.setBadgeText({ text: "", tabId });
             sendResponse({ active: false });
         } else {
-            await chrome.tabs.sendMessage(tabId, { type: "ACTIVATE" });
+            // Try sending ACTIVATE; if the content script isn't loaded yet,
+            // inject it programmatically and retry.
+            try {
+                await chrome.tabs.sendMessage(tabId, { type: "ACTIVATE" });
+            } catch {
+                // Content script not loaded — inject it dynamically
+                const manifest = chrome.runtime.getManifest();
+                const contentScriptFiles = manifest.content_scripts?.[0]?.js || [];
+                if (contentScriptFiles.length > 0) {
+                    await chrome.scripting.executeScript({
+                        target: { tabId },
+                        files: contentScriptFiles,
+                    });
+                    // Wait for it to mount
+                    await new Promise((r) => setTimeout(r, 600));
+                }
+                // Retry
+                try {
+                    await chrome.tabs.sendMessage(tabId, { type: "ACTIVATE" });
+                } catch (retryErr) {
+                    console.warn("AnnotateWeb: retry sendMessage failed", retryErr);
+                }
+            }
             activeTabs.add(tabId);
             sendResponse({ active: true });
         }
@@ -289,6 +321,10 @@ async function compositeScreenshot(dataUrl, rect, annotationNumber, annotationCo
     }
 
     // ─── Draw the cropped screenshot below ───────────────────────────────
+    // Background fill behind element (matches grid screenshot behavior)
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, headerHeight, finalWidth, cropH);
+
     // Center the screenshot if the header is wider
     const screenshotX = Math.round((finalWidth - cropW) / 2);
     ctx.drawImage(bitmap, cropX, cropY, cropW, cropH, screenshotX, headerHeight, cropW, cropH);
@@ -669,6 +705,370 @@ async function compositeGridScreenshot(dataUrl, items) {
     return new Promise((resolve) => {
         reader.onload = () => resolve(reader.result);
         reader.readAsDataURL(finalBlob);
+    });
+}
+
+// ─── Scroll-and-stitch handlers ──────────────────────────────────────────────
+
+/**
+ * Handle stitching of viewport chunks into a full-page screenshot
+ * with an annotation summary header.
+ */
+async function handleStitchFullpage(message, sendResponse) {
+    try {
+        const { chunks, annotations, pageHeight, viewportHeight, viewportWidth, dpr } = message;
+
+        if (!chunks || chunks.length === 0) {
+            sendResponse({ error: "No chunks to stitch" });
+            return;
+        }
+
+        const result = await stitchFullpageComposite(chunks, annotations, pageHeight, viewportHeight, viewportWidth, dpr);
+        sendResponse({ dataUrl: result });
+    } catch (err) {
+        console.error("AnnotateWeb stitch fullpage error:", err);
+        sendResponse({ error: err.message });
+    }
+}
+
+/**
+ * Handle compositing of per-annotation cropped screenshots into a grid.
+ */
+async function handleStitchGrid(message, sendResponse) {
+    try {
+        const { items } = message;
+
+        if (!items || items.length === 0) {
+            sendResponse({ error: "No items to composite" });
+            return;
+        }
+
+        const result = await stitchGridComposite(items);
+        sendResponse({ dataUrl: result });
+    } catch (err) {
+        console.error("AnnotateWeb stitch grid error:", err);
+        sendResponse({ error: err.message });
+    }
+}
+
+/**
+ * Stitch viewport chunks into a single tall image,
+ * then add an annotation summary header at the top.
+ */
+async function stitchFullpageComposite(chunks, annotations, pageHeight, viewportHeight, viewportWidth, dpr) {
+    // Decode all chunk bitmaps
+    const chunkBitmaps = [];
+    for (const chunk of chunks) {
+        const resp = await fetch(chunk.dataUrl);
+        const blob = await resp.blob();
+        const bitmap = await createImageBitmap(blob);
+        chunkBitmaps.push({ bitmap, scrollY: chunk.scrollY });
+    }
+
+    const imgW = chunkBitmaps[0].bitmap.width;
+    const scale = imgW > 2000 ? 2 : 1;
+    const totalPixelHeight = Math.round(pageHeight * dpr);
+    const vpPixelHeight = chunkBitmaps[0].bitmap.height;
+
+    // 1. Stitch chunks into one tall canvas
+    const stitchCanvas = new OffscreenCanvas(imgW, totalPixelHeight);
+    const stitchCtx = stitchCanvas.getContext("2d");
+
+    // Sort chunks by scrollY and draw, deduplicating overlap
+    chunkBitmaps.sort((a, b) => a.scrollY - b.scrollY);
+
+    for (const { bitmap, scrollY } of chunkBitmaps) {
+        const destY = Math.round(scrollY * dpr);
+        stitchCtx.drawImage(bitmap, 0, destY);
+    }
+
+    // 2. Build annotation header (reuse same metrics as compositeFullpageScreenshot)
+    if (!annotations || annotations.length === 0) {
+        const finalBlob = await stitchCanvas.convertToBlob({ type: "image/png" });
+        return await blobToDataUrl(finalBlob);
+    }
+
+    const headerPadding = Math.round(16 * scale);
+    const rowGap = Math.round(8 * scale);
+    const circleRadius = Math.round(12 * scale);
+    const circleMarginRight = Math.round(10 * scale);
+    const fontSize = Math.round(13 * scale);
+    const circleFontSize = Math.round(11 * scale);
+    const lineHeight = Math.round(18 * scale);
+    const cornerRadius = Math.round(12 * scale);
+    const dividerHeight = Math.round(1 * scale);
+
+    const measureCanvas = new OffscreenCanvas(1, 1);
+    const measureCtx = measureCanvas.getContext("2d");
+    measureCtx.font = `500 ${fontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif`;
+
+    const textAreaLeft = headerPadding + circleRadius * 2 + circleMarginRight;
+    const maxTextWidth = imgW - textAreaLeft - headerPadding;
+
+    const rows = annotations.map((a) => {
+        const text = a.comment || a.element || '';
+        const lines = text ? wrapText(measureCtx, text, maxTextWidth) : [''];
+        return {
+            number: a.number,
+            lines,
+            height: Math.max(circleRadius * 2, lines.length * lineHeight),
+        };
+    });
+
+    const totalRowsHeight = rows.reduce((sum, r) => sum + r.height, 0)
+        + (rows.length - 1) * rowGap;
+    const headerHeight = totalRowsHeight + headerPadding * 2;
+
+    // 3. Create final canvas with header + stitched page
+    const finalH = headerHeight + dividerHeight + totalPixelHeight;
+    const canvas = new OffscreenCanvas(imgW, finalH);
+    const ctx = canvas.getContext("2d");
+
+    // Header bg
+    ctx.fillStyle = "#1a1a1a";
+    ctx.beginPath();
+    ctx.moveTo(cornerRadius, 0);
+    ctx.lineTo(imgW - cornerRadius, 0);
+    ctx.quadraticCurveTo(imgW, 0, imgW, cornerRadius);
+    ctx.lineTo(imgW, headerHeight);
+    ctx.lineTo(0, headerHeight);
+    ctx.lineTo(0, cornerRadius);
+    ctx.quadraticCurveTo(0, 0, cornerRadius, 0);
+    ctx.closePath();
+    ctx.fill();
+
+    // Divider
+    ctx.fillStyle = "rgba(255, 255, 255, 0.1)";
+    ctx.fillRect(0, headerHeight, imgW, dividerHeight);
+
+    // Annotation rows
+    let currentY = headerPadding;
+    rows.forEach((row) => {
+        const rowCenterY = currentY + row.height / 2;
+
+        ctx.fillStyle = "#3c82f7";
+        ctx.beginPath();
+        ctx.arc(headerPadding + circleRadius, rowCenterY, circleRadius, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = "#ffffff";
+        ctx.font = `600 ${circleFontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(row.number, headerPadding + circleRadius, rowCenterY);
+
+        ctx.fillStyle = "rgba(255, 255, 255, 0.85)";
+        ctx.font = `500 ${fontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif`;
+        ctx.textAlign = "left";
+        ctx.textBaseline = "top";
+
+        const textStartY = rowCenterY - (row.lines.length * lineHeight) / 2;
+        row.lines.forEach((line, i) => {
+            ctx.fillText(line, textAreaLeft, textStartY + i * lineHeight);
+        });
+
+        currentY += row.height + rowGap;
+    });
+
+    // Draw stitched page below header
+    ctx.drawImage(stitchCanvas, 0, 0, imgW, totalPixelHeight, 0, headerHeight + dividerHeight, imgW, totalPixelHeight);
+
+    const finalBlob = await canvas.convertToBlob({ type: "image/png" });
+    return await blobToDataUrl(finalBlob);
+}
+
+/**
+ * Composite per-annotation screenshot crops into a masonry grid
+ * with annotation summary header and numbered badges.
+ */
+async function stitchGridComposite(items) {
+    // Decode each item's screenshot and crop to the annotation rect
+    const croppedBitmaps = [];
+    for (const item of items) {
+        const resp = await fetch(item.dataUrl);
+        const blob = await resp.blob();
+        const bitmap = await createImageBitmap(blob);
+
+        const dpr = item.rect.dpr || 1;
+        const sX = Math.round(item.rect.x * dpr);
+        const sY = Math.round(item.rect.y * dpr);
+        const sW = Math.round(item.rect.width * dpr);
+        const sH = Math.round(item.rect.height * dpr);
+
+        // Crop
+        const cropCanvas = new OffscreenCanvas(sW, sH);
+        const cropCtx = cropCanvas.getContext("2d");
+        cropCtx.drawImage(bitmap, sX, sY, sW, sH, 0, 0, sW, sH);
+
+        const cropBlob = await cropCanvas.convertToBlob({ type: "image/png" });
+        const croppedBitmap = await createImageBitmap(cropBlob);
+        croppedBitmaps.push({
+            bitmap: croppedBitmap,
+            annotation: item.annotation,
+            width: sW,
+            height: sH,
+        });
+    }
+
+    // Use the first cropped bitmap's width to determine scale
+    const firstItem = items[0];
+    const dpr = firstItem.rect.dpr || 1;
+    const imgW = Math.round((firstItem.rect.width * dpr) * 3); // approximate reasonable canvas width
+    const clampedW = Math.max(imgW, 800); // minimum width
+    const scale = clampedW > 2000 ? 2 : 1;
+
+    // Header metrics
+    const headerPadding = Math.round(16 * scale);
+    const rowGap = Math.round(8 * scale);
+    const circleRadius = Math.round(12 * scale);
+    const circleMarginRight = Math.round(10 * scale);
+    const fontSize = Math.round(13 * scale);
+    const circleFontSize = Math.round(11 * scale);
+    const lineHeight = Math.round(18 * scale);
+    const cornerRadius = Math.round(12 * scale);
+    const dividerHeight = Math.round(1 * scale);
+    const gridGap = Math.round(16 * scale);
+
+    const annotations = items.map(item => ({
+        number: item.annotation.number,
+        comment: item.annotation.comment
+    }));
+
+    const measureCanvas = new OffscreenCanvas(1, 1);
+    const measureCtx = measureCanvas.getContext("2d");
+    measureCtx.font = `500 ${fontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif`;
+
+    const textAreaLeft = headerPadding + circleRadius * 2 + circleMarginRight;
+    const maxTextWidth = clampedW - textAreaLeft - headerPadding;
+
+    const rows = annotations.map((a) => {
+        const text = a.comment || '';
+        const lines = text ? wrapText(measureCtx, text, maxTextWidth) : [''];
+        return {
+            number: a.number,
+            lines,
+            height: Math.max(circleRadius * 2, lines.length * lineHeight),
+        };
+    });
+
+    const totalRowsHeight = rows.reduce((sum, r) => sum + r.height, 0)
+        + (rows.length - 1) * rowGap;
+    const headerHeight = totalRowsHeight + headerPadding * 2;
+
+    // Grid layout — 2-column masonry
+    const cols = 2;
+    const colWidth = (clampedW - (cols + 1) * gridGap) / cols;
+    const colHeights = new Array(cols).fill(headerHeight + dividerHeight + gridGap);
+
+    const laidOutItems = croppedBitmaps.map((item) => {
+        const aspect = item.width / item.height;
+        const tW = colWidth;
+        const tH = tW / aspect;
+
+        const colIndex = colHeights.indexOf(Math.min(...colHeights));
+        const x = gridGap + colIndex * (colWidth + gridGap);
+        const y = colHeights[colIndex];
+        colHeights[colIndex] += tH + gridGap;
+
+        return { ...item, targetRect: { x, y, width: tW, height: tH } };
+    });
+
+    const totalGridHeight = Math.max(...colHeights);
+
+    // Draw
+    const canvas = new OffscreenCanvas(clampedW, totalGridHeight);
+    const ctx = canvas.getContext("2d");
+
+    // Background
+    ctx.fillStyle = "#1a1a1a";
+    ctx.beginPath();
+    ctx.moveTo(cornerRadius, 0);
+    ctx.lineTo(clampedW - cornerRadius, 0);
+    ctx.quadraticCurveTo(clampedW, 0, clampedW, cornerRadius);
+    ctx.lineTo(clampedW, totalGridHeight);
+    ctx.lineTo(0, totalGridHeight);
+    ctx.lineTo(0, cornerRadius);
+    ctx.quadraticCurveTo(0, 0, cornerRadius, 0);
+    ctx.closePath();
+    ctx.fill();
+
+    // Divider
+    ctx.fillStyle = "rgba(255, 255, 255, 0.1)";
+    ctx.fillRect(0, headerHeight, clampedW, dividerHeight);
+
+    // Header rows
+    let currentY = headerPadding;
+    rows.forEach((row) => {
+        const rowCenterY = currentY + row.height / 2;
+
+        ctx.fillStyle = "#3c82f7";
+        ctx.beginPath();
+        ctx.arc(headerPadding + circleRadius, rowCenterY, circleRadius, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = "#ffffff";
+        ctx.font = `600 ${circleFontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(row.number, headerPadding + circleRadius, rowCenterY);
+
+        ctx.fillStyle = "rgba(255, 255, 255, 0.85)";
+        ctx.font = `500 ${fontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif`;
+        ctx.textAlign = "left";
+        ctx.textBaseline = "top";
+
+        const textStartY = rowCenterY - (row.lines.length * lineHeight) / 2;
+        row.lines.forEach((line, i) => {
+            ctx.fillText(line, textAreaLeft, textStartY + i * lineHeight);
+        });
+
+        currentY += row.height + rowGap;
+    });
+
+    // Grid items with badges
+    laidOutItems.forEach(item => {
+        const { bitmap, targetRect, annotation } = item;
+
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(targetRect.x, targetRect.y, targetRect.width, targetRect.height);
+
+        ctx.drawImage(
+            bitmap,
+            0, 0, bitmap.width, bitmap.height,
+            targetRect.x, targetRect.y, targetRect.width, targetRect.height
+        );
+
+        ctx.strokeStyle = "rgba(255,255,255,0.1)";
+        ctx.lineWidth = 1 * scale;
+        ctx.strokeRect(targetRect.x, targetRect.y, targetRect.width, targetRect.height);
+
+        // Badge
+        const badgeX = targetRect.x + 12 * scale;
+        const badgeY = targetRect.y + 12 * scale;
+        const badgeRadius = 10 * scale;
+
+        ctx.fillStyle = "#3c82f7";
+        ctx.beginPath();
+        ctx.arc(badgeX + badgeRadius, badgeY + badgeRadius, badgeRadius, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = "#ffffff";
+        ctx.font = `600 ${10 * scale}px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(annotation.number, badgeX + badgeRadius, badgeY + badgeRadius);
+    });
+
+    const finalBlob = await canvas.convertToBlob({ type: "image/png" });
+    return await blobToDataUrl(finalBlob);
+}
+
+/** Convert a Blob to a data URL. */
+function blobToDataUrl(blob) {
+    const reader = new FileReader();
+    return new Promise((resolve) => {
+        reader.onload = () => resolve(reader.result);
+        reader.readAsDataURL(blob);
     });
 }
 
