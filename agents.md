@@ -87,5 +87,5 @@ Load `dist/` as unpacked extension in `chrome://extensions`.
 
 ## Theme behavior
 
-- Added popup sharing controls keep the established dark visual style while SVG/icon accents (and on-page screenshot/share affordances) follow Agentation's current light/dark mode using its persisted `feedback-toolbar-theme` setting (with toolbar/style detection fallback).
+- Added popup sharing controls now fully switch between Agentation-aligned dark/light styling, while SVG/icon colors and on-page screenshot/share affordances follow the active theme via `feedback-toolbar-theme` (with toolbar/style detection fallback).
 - If Agentation theme cannot be detected (e.g., toolbar closed), fallback uses system `prefers-color-scheme`.

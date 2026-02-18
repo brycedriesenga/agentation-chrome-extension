@@ -282,27 +282,127 @@ body {
 }
 
 
-/* Keep the classic dark popup style in both modes; only tune accent/icon tones */
+
+/* Light theme styling aligned with Agentation's light settings aesthetic */
 body.theme-light {
-  background: #000000;
-  color: #ffffff;
+  background: #eef1f5;
+  color: #2f333a;
 }
 
-body.theme-light .action-icon,
+body.theme-light .popup {
+  background: #ffffff;
+  border: 1px solid #dde2e9;
+  border-radius: 14px;
+  box-shadow: 0 6px 20px rgba(20, 29, 44, 0.08);
+}
+
 body.theme-light .logo,
-body.theme-light .logo svg {
-  color: #e6e6e6;
+body.theme-light .logo svg,
+body.theme-light .action-icon {
+  color: #323740;
+}
+
+body.theme-light .badge {
+  background: #f2f4f7;
+  border-color: #d2d8e1;
+  color: #3a404a;
+}
+
+body.theme-light .toggle-row {
+  background: #f7f8fa;
+  border-color: #d8dde5;
+}
+
+body.theme-light .toggle-label {
+  color: #6c717b;
+}
+
+body.theme-light .toggle-slider {
+  background: #d7dbe2;
+  border-color: #cfd5dd;
+}
+
+body.theme-light .toggle-slider::before {
+  background: #ffffff;
+}
+
+body.theme-light .toggle-switch input:checked + .toggle-slider {
+  background: #2f7cf6;
+  border-color: #2f7cf6;
+}
+
+body.theme-light .toggle-switch input:checked + .toggle-slider::before {
+  background: #ffffff;
+}
+
+body.theme-light .status-dot.inactive {
+  background: #a0a6b0;
 }
 
 body.theme-light .status-dot.active {
-  background: #e6e6e6;
-  box-shadow: 0 0 8px rgba(255, 255, 255, 0.35);
+  background: #2f7cf6;
+  box-shadow: 0 0 8px rgba(47, 124, 246, 0.35);
+}
+
+body.theme-light .status-text {
+  color: #7b818c;
+}
+
+body.theme-light .divider {
+  background: #e2e6ec;
+}
+
+body.theme-light .action-btn {
+  background: #f4f6f9;
+  border-color: #d7dce4;
+  color: #4f5560;
+}
+
+body.theme-light .action-btn:hover {
+  background: #eceff4;
+  border-color: #c8ced8;
+  color: #2f333a;
+}
+
+body.theme-light .action-btn:active {
+  background: #e4e8ee;
+}
+
+body.theme-light .action-btn.secondary {
+  background: #ffffff;
+}
+
+body.theme-light .share-panel {
+  border-color: #dde2e9;
+  background: #fbfcfd;
+}
+
+body.theme-light .share-panel label {
+  color: #69707b;
+}
+
+body.theme-light .share-panel textarea {
+  background: #ffffff;
+  color: #242a33;
+  border-color: #ced5df;
 }
 
 body.theme-light .status-message {
-  color: #b7dcff;
+  color: #1f6ad8;
 }
 
 body.theme-light .status-message.error {
-  color: #ff9e9e;
+  color: #c43a44;
+}
+
+body.theme-light .footer {
+  color: #818792;
+}
+
+body.theme-light .footer a {
+  color: #626975;
+}
+
+body.theme-light .footer a:hover {
+  color: #2f333a;
 }
