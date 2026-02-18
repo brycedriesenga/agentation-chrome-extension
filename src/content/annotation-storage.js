@@ -14,7 +14,11 @@ export function writeAnnotations(annotations) {
 
 export function emitAnnotationCount() {
     const count = readCurrentAnnotations().length;
-    chrome.runtime.sendMessage({ type: "ANNOTATION_COUNT", count });
+    try {
+        chrome.runtime.sendMessage({ type: "ANNOTATION_COUNT", count });
+    } catch {
+        // Extension context invalidated (extension was reloaded without page refresh)
+    }
 }
 
 export function requestAnnotationRefresh() {

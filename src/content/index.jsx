@@ -60,11 +60,15 @@ function AnnotateWebApp() {
 
     const updateBadgeCount = useCallback(() => {
         setTimeout(() => {
-            const annotations = loadAnnotations(window.location.pathname);
-            chrome.runtime.sendMessage({
-                type: "ANNOTATION_COUNT",
-                count: annotations.length,
-            });
+            try {
+                const annotations = loadAnnotations(window.location.pathname);
+                chrome.runtime.sendMessage({
+                    type: "ANNOTATION_COUNT",
+                    count: annotations.length,
+                });
+            } catch {
+                // Extension context invalidated
+            }
         }, 250);
     }, []);
 
@@ -153,10 +157,14 @@ function AnnotateWebApp() {
             onAnnotationUpdate={() => updateBadgeCount()}
             onAnnotationsClear={() => {
                 // Clear resets count to 0 — no need to read from localStorage
-                chrome.runtime.sendMessage({
-                    type: "ANNOTATION_COUNT",
-                    count: 0,
-                });
+                try {
+                    chrome.runtime.sendMessage({
+                        type: "ANNOTATION_COUNT",
+                        count: 0,
+                    });
+                } catch {
+                    // Extension context invalidated
+                }
             }}
         />
     );
