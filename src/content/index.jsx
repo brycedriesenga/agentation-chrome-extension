@@ -180,20 +180,42 @@ function mount() {
 
     const styleEl = document.createElement("style");
     styleEl.textContent = `
-      /* ── CSS Isolation: revert ALL inherited host-page styles ─────── */
-      /* Agentation toolbar, markers, popups, highlights, overlays */
-      [data-feedback-toolbar],
-      [data-feedback-toolbar] *,
-      [data-annotation-marker],
-      [data-annotation-marker] *,
+      /* ── CSS Isolation: reset commonly-inherited host-page styles ─── */
+      /* Only reset properties that leak via inheritance / wildcard selectors.
+         We do NOT use 'all: revert' because that also nukes Agentation's
+         own CSS module styles. */
+      #annotateweb-root,
+      #annotateweb-root *,
       [class*="styles-module__"],
       [class*="styles-module__"] * {
-        all: revert !important;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif !important;
+        line-height: normal !important;
+        letter-spacing: normal !important;
+        word-spacing: normal !important;
+        text-transform: none !important;
+        text-indent: 0 !important;
+        text-shadow: none !important;
+        text-decoration: none !important;
+        text-align: left !important;
+        white-space: normal !important;
+        direction: ltr !important;
+        word-break: normal !important;
+        overflow-wrap: normal !important;
+        -webkit-text-stroke: 0 !important;
+        -webkit-font-smoothing: antialiased !important;
+        visibility: visible !important;
+        float: none !important;
+        clear: none !important;
+        vertical-align: baseline !important;
+        list-style: none !important;
+        border-collapse: separate !important;
+        border-spacing: 0 !important;
+        table-layout: auto !important;
+        quotes: none !important;
+        cursor: auto !important;
       }
-
-      /* Re-apply critical layout properties that 'all: revert' may undo */
-      [data-feedback-toolbar] *,
-      [data-annotation-marker] *,
+      /* Prevent host-page wildcard box-sizing from messing up Agentation layout */
+      [class*="styles-module__"],
       [class*="styles-module__"] * {
         box-sizing: border-box !important;
       }
