@@ -87,6 +87,46 @@ function injectTemporaryMarkers(annotations) {
     return markers;
 }
 
+
+function isIgnoredCaptureElement(el) {
+    if (!el) return true;
+    return Boolean(
+        el.closest('[data-feedback-toolbar]') ||
+        el.closest('[data-annotation-marker]') ||
+        el.closest('.annotateweb-screenshot-btn') ||
+        el.closest('#annotateweb-root')
+    );
+}
+
+function resolveAnnotationElement(annotation) {
+    if (annotation?.elementPath) {
+        try {
+            const byPath = document.querySelector(annotation.elementPath);
+            if (byPath) return byPath;
+        } catch {
+            // ignore invalid selector; try coordinate fallback
+        }
+    }
+
+    if (typeof annotation?.x !== 'number' || typeof annotation?.y !== 'number') {
+        return null;
+    }
+
+    const viewportX = Math.round((annotation.x / 100) * window.innerWidth);
+    const viewportY = Math.round(annotation.isFixed ? annotation.y : annotation.y - window.scrollY);
+
+    if (viewportX < 0 || viewportY < 0 || viewportX > window.innerWidth || viewportY > window.innerHeight) {
+        return null;
+    }
+
+    const hit = document.elementFromPoint(viewportX, viewportY);
+    if (!hit || isIgnoredCaptureElement(hit)) {
+        return null;
+    }
+
+    return hit;
+}
+
 /**
  * Initialize screenshot buttons on annotation markers.
  * Called after Agentation renders markers, and re-called on DOM mutations.
@@ -430,16 +470,15 @@ export async function captureFullPage() {
     // 3. Inject temporary highlight borders around annotated elements
     const highlightOverlays = [];
     annotations.forEach((annotation) => {
-        if (!annotation.elementPath) return;
-        try {
-            const el = document.querySelector(annotation.elementPath);
-            if (!el) return;
-            const rect = el.getBoundingClientRect();
-            if (rect.width === 0 || rect.height === 0) return;
+        const el = resolveAnnotationElement(annotation);
+        if (!el) return;
 
-            const overlay = document.createElement('div');
-            overlay.className = 'annotateweb-highlight-overlay';
-            overlay.style.cssText = `
+        const rect = el.getBoundingClientRect();
+        if (rect.width === 0 || rect.height === 0) return;
+
+        const overlay = document.createElement('div');
+        overlay.className = 'annotateweb-highlight-overlay';
+        overlay.style.cssText = `
                 position: fixed;
                 top: ${rect.top - 2}px;
                 left: ${rect.left - 2}px;
@@ -452,11 +491,8 @@ export async function captureFullPage() {
                 z-index: 2147483640;
                 box-sizing: border-box;
             `;
-            document.body.appendChild(overlay);
-            highlightOverlays.push(overlay);
-        } catch {
-            // Invalid selector or element not found — skip
-        }
+        document.body.appendChild(overlay);
+        highlightOverlays.push(overlay);
     });
 
     // 4. Inject temporary markers (ensures visibility even if toolbar closed)
@@ -507,41 +543,35 @@ export async function captureAnnotationGrid() {
     const dpr = window.devicePixelRatio || 1;
 
     annotations.forEach((a, i) => {
-        if (!a.elementPath) return;
-        try {
-            const el = document.querySelector(a.elementPath);
-            if (!el) return;
-            const rect = el.getBoundingClientRect();
-            if (rect.width === 0 || rect.height === 0) return;
+        const el = resolveAnnotationElement(a);
+        if (!el) return;
 
-            // Check if roughly visible in viewport (simple check)
-            if (
-                rect.bottom < 0 ||
-                rect.right < 0 ||
-                rect.top > window.innerHeight ||
-                rect.left > window.innerWidth
-            ) {
-                return;
-            }
+        const rect = el.getBoundingClientRect();
+        if (rect.width === 0 || rect.height === 0) return;
 
-            // Add padding
-            const padding = 16;
-            gridItems.push({
-                annotation: {
-                    number: String(i + 1),
-                    comment: a.comment || '',
-                },
-                rect: {
-                    x: Math.max(0, rect.left - padding),
-                    y: Math.max(0, rect.top - padding),
-                    width: rect.width + padding * 2,
-                    height: rect.height + padding * 2,
-                    dpr: dpr
-                }
-            });
-        } catch {
-            // Element not found
+        if (
+            rect.bottom < 0 ||
+            rect.right < 0 ||
+            rect.top > window.innerHeight ||
+            rect.left > window.innerWidth
+        ) {
+            return;
         }
+
+        const padding = 16;
+        gridItems.push({
+            annotation: {
+                number: String(i + 1),
+                comment: a.comment || '',
+            },
+            rect: {
+                x: Math.max(0, rect.left - padding),
+                y: Math.max(0, rect.top - padding),
+                width: rect.width + padding * 2,
+                height: rect.height + padding * 2,
+                dpr: dpr
+            }
+        });
     });
 
     if (gridItems.length === 0) {

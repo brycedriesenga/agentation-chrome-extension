@@ -61,6 +61,18 @@ async function getCurrentTab() {
     return tab;
 }
 
+async function requestOpenFeedbackMode(tabId) {
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+        try {
+            await chrome.tabs.sendMessage(tabId, { type: "OPEN_FEEDBACK_MODE" });
+            return true;
+        } catch {
+            await new Promise((resolve) => setTimeout(resolve, 120 + attempt * 100));
+        }
+    }
+    return false;
+}
+
 async function getSharePayload(tabId) {
     const response = await chrome.tabs.sendMessage(tabId, { type: "EXPORT_SHARE_DATA" });
     if (!response?.ok) {
@@ -122,7 +134,7 @@ async function init() {
         });
         updateUI(result.active);
         if (result.active) {
-            await chrome.tabs.sendMessage(tab.id, { type: "OPEN_FEEDBACK_MODE" });
+            await requestOpenFeedbackMode(tab.id);
         }
     });
 
@@ -212,7 +224,7 @@ async function init() {
                 throw new Error(importResponse?.error || "Import failed.");
             }
 
-            await chrome.tabs.sendMessage(tab.id, { type: "OPEN_FEEDBACK_MODE" });
+            await requestOpenFeedbackMode(tab.id);
             setStatus(getSummaryText(importResponse.summary));
             sharePanel.hidden = true;
             shareInput.value = "";

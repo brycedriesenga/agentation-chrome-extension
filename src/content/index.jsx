@@ -12,20 +12,45 @@ const messageRouter = createMessageRouter({ captureFullPage, captureAnnotationGr
 chrome.runtime.onMessage.addListener(messageRouter);
 
 
+function findStartFeedbackButton() {
+    return document.querySelector('[data-feedback-toolbar] button[title="Start feedback mode"], [data-feedback-toolbar][title="Start feedback mode"]');
+}
+
 function openFeedbackModeWithRetry() {
-    const tryOpen = (attempt = 0) => {
-        const startButton = document.querySelector('button[title="Start feedback mode"]');
-        if (startButton) {
-            startButton.click();
+    const existing = findStartFeedbackButton();
+    if (existing) {
+        existing.click();
+        return;
+    }
+
+    let attempts = 0;
+    const maxAttempts = 80;
+    const interval = setInterval(() => {
+        const btn = findStartFeedbackButton();
+        if (btn) {
+            clearInterval(interval);
+            btn.click();
             return;
         }
 
-        if (attempt < 12) {
-            setTimeout(() => tryOpen(attempt + 1), 120);
+        attempts += 1;
+        if (attempts >= maxAttempts) {
+            clearInterval(interval);
         }
-    };
+    }, 100);
 
-    setTimeout(() => tryOpen(), 60);
+    const observer = new MutationObserver(() => {
+        const btn = findStartFeedbackButton();
+        if (btn) {
+            clearInterval(interval);
+            observer.disconnect();
+            btn.click();
+        }
+    });
+
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    setTimeout(() => observer.disconnect(), 9000);
 }
 
 function AnnotateWebApp() {
