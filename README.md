@@ -10,7 +10,9 @@ A Chrome extension that brings [Agentation](https://agentation.dev)'s visual fee
 - ▦ **Grid screenshots** — Capture individual annotated elements arranged in a clean grid layout
 - 📋 **Copy feedback** — Export annotations as structured markdown (via Agentation)
 - 🔢 **Badge count** — See annotation count at a glance on the extension icon
-- 🎨 **Clean B&W Design** — Minimalist black & white theme with custom SVG icons
+- 🔗 **No-server sharing** — Copy share text or a share URL to transfer annotations without a backend
+- 📥 **Import modes** — Paste shared data and choose Replace or Merge import behavior with merge summaries
+- 🎨 **Theme-aware controls** — Popup and in-page share/screenshot affordances adapt to Agentation light/dark mode
 - ⌨️ **Keyboard shortcut** — `Ctrl+Shift+.` to toggle annotations
 
 ## Getting Started
@@ -41,6 +43,10 @@ npm run build
 4. Use the 📷 button on any marker to screenshot that element
 5. Use **Screenshot Page** in the popup for a full-page capture with annotation summary
 6. Use **Screenshot Grid** in the popup to capture all visible annotated elements in a grid layout
+7. Use **Copy Share Text** to copy an encoded payload for chat/email sharing
+8. Use **Copy Share URL** to generate a URL hash link (best for smaller payloads)
+9. Use **Paste Shared Data** to import shared text/URL and choose **Replace** or **Merge**
+10. Imports refresh in-page annotations automatically (no manual reload needed)
 
 Screenshots are automatically copied to clipboard.
 
@@ -60,7 +66,12 @@ src/
 ├── background/service-worker.js   # Service worker: toggle, badge, screenshot compositing
 ├── content/index.jsx              # Mounts Agentation toolbar into pages
 ├── content/screenshot.js          # Screenshot capture + annotation header logic
-└── popup/                         # Extension popup (toggle + screenshot button)
+├── content/message-router.js      # Content-script message routing (screenshots + sharing)
+├── content/share-sync.js          # Share export/import orchestration + hash import
+├── content/annotation-storage.js  # LocalStorage helpers, badge update, live refresh trigger
+├── content/theme.js               # Agentation theme detection + palette helpers
+├── popup/                         # Extension popup (toggle, screenshots, share import/export)
+└── shared/                        # Share payload + page key utilities
 ```
 
 ## Maintenance & Compatibility

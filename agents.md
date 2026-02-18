@@ -11,7 +11,13 @@ src/
 ├── background/service-worker.js   # MV3 service worker: toggle, badge, screenshot compositing
 ├── content/index.jsx              # React entry: mounts Agentation, handles activation/badge
 ├── content/screenshot.js          # Screenshot capture, annotation header compositing
-├── popup/popup.html/css/js        # Extension popup UI: toggle switch, screenshot button
+├── content/message-router.js      # Content-script message routing for screenshot/share actions
+├── content/share-sync.js          # Share export/import orchestration + hash import
+├── content/annotation-storage.js  # Agentation localStorage read/write + badge/refresh helpers
+├── content/theme.js               # Detects Agentation light/dark mode for extension UI parity
+├── popup/popup.html/css/js        # Extension popup UI: toggle, screenshots, share import/export
+├── shared/page-key.js             # Normalized page key utility for sharing
+├── shared/share-payload.js        # Share payload schema + encode/decode helpers
 └── icons/                         # Extension icons (16, 48, 128) - PNG format
 ```
 
@@ -65,3 +71,21 @@ Load `dist/` as unpacked extension in `chrome://extensions`.
 | `onAnnotationDelete` callback | Badge count updates |
 | `onAnnotationUpdate` callback | Badge count updates |
 | `onAnnotationsClear` callback | Badge count updates |
+
+## Sharing (No Server)
+
+- Share payloads use a versioned schema (`v`, `pageKey`, `annotations`, metadata).
+- `pageKey` is normalized as `origin + pathname` (trailing slash trimmed except root).
+- Popup actions support:
+  - **Copy Share Text** (encoded payload)
+  - **Copy Share URL** (`#annotateweb=` hash; guarded by size limit)
+  - **Paste Shared Data** with **Replace** or **Merge** import modes
+- Content script supports import from URL hash on page load with user confirmation.
+- Imports write directly to Agentation localStorage key (`feedback-annotations-{pathname}`), update badge counts, and trigger live in-page refresh (no reload prompt).
+- Merge imports return summary stats (`added`, `updated`, `skippedDuplicates`, `conflictsResolved`) for clearer UX feedback.
+
+
+## Theme behavior
+
+- Added popup sharing controls and in-page screenshot/share affordances follow Agentation's current light/dark mode using its persisted `feedback-toolbar-theme` setting (with toolbar/style detection fallback).
+- If Agentation theme cannot be detected (e.g., toolbar closed), fallback uses system `prefers-color-scheme`.

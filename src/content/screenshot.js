@@ -3,6 +3,7 @@
 // Handles clean captures by hiding overlays and compositing annotation headers
 
 import { loadAnnotations } from "agentation";
+import { getThemePalette } from "./theme.js";
 
 /**
  * Selectors for Agentation UI elements that should be hidden during captures.
@@ -52,6 +53,7 @@ function nextFrame() {
  */
 function injectTemporaryMarkers(annotations) {
     const markers = [];
+    const palette = getThemePalette();
     annotations.forEach((a, i) => {
         // Skip if invalid coords
         if (typeof a.x !== 'number' || typeof a.y !== 'number') return;
@@ -65,8 +67,8 @@ function injectTemporaryMarkers(annotations) {
             top: ${a.y}px;
             width: 24px;
             height: 24px;
-            background-color: #6366f1; /* Indigo-500 matching default */
-            color: white;
+            background-color: ${palette.markerBg};
+            color: ${palette.markerText};
             border-radius: 50%;
             display: flex;
             align-items: center;
@@ -74,7 +76,7 @@ function injectTemporaryMarkers(annotations) {
             font-size: 12px;
             font-weight: 600;
             font-family: system-ui, sans-serif;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            box-shadow: ${palette.markerShadow};
             z-index: 2147483645; /* Above highlights (ending in 40) */
             pointer-events: none;
             transform: translate(-50%, -50%); /* Agentation centers on point */
@@ -91,6 +93,7 @@ function injectTemporaryMarkers(annotations) {
  */
 export function initScreenshotButtons() {
     const markers = document.querySelectorAll('[data-annotation-marker]');
+    const palette = getThemePalette();
 
     markers.forEach((marker) => {
         // Skip if already enhanced
@@ -100,7 +103,7 @@ export function initScreenshotButtons() {
         // Add a screenshot button next to/inside the marker on hover
         const btn = document.createElement("button");
         btn.className = "annotateweb-screenshot-btn";
-        btn.innerHTML = `<svg width="12" height="10" viewBox="0 0 24 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M23 17C23 17.5304 22.7893 18.0391 22.4142 18.4142C22.0391 18.7893 21.5304 19 21 19H3C2.46957 19 1.96086 18.7893 1.58579 18.4142C1.21071 18.0391 1 17.5304 1 17V6C1 5.46957 1.21071 4.96086 1.58579 4.58579C1.96086 4.21071 2.46957 4 3 4H7L9 1H15L17 4H21C21.5304 4 22.0391 4.21071 22.4142 4.58579C22.7893 4.96086 23 5.46957 23 6V17Z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 15C14.2091 15 16 13.2091 16 11C16 8.79086 14.2091 7 12 7C9.79086 7 8 8.79086 8 11C8 13.2091 9.79086 15 12 15Z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+        btn.innerHTML = `<svg width="12" height="10" viewBox="0 0 24 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M23 17C23 17.5304 22.7893 18.0391 22.4142 18.4142C22.0391 18.7893 21.5304 19 21 19H3C2.46957 19 1.96086 18.7893 1.58579 18.4142C1.21071 18.0391 1 17.5304 1 17V6C1 5.46957 1.21071 4.96086 1.58579 4.58579C1.96086 4.21071 2.46957 4 3 4H7L9 1H15L17 4H21C21.5304 4 22.0391 4.21071 22.4142 4.58579C22.7893 4.96086 23 5.46957 23 6V17Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 15C14.2091 15 16 13.2091 16 11C16 8.79086 14.2091 7 12 7C9.79086 7 8 8.79086 8 11C8 13.2091 9.79086 15 12 15Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
         btn.title = "Screenshot this element";
         btn.style.cssText = `
       position: absolute;
@@ -109,10 +112,10 @@ export function initScreenshotButtons() {
       width: 20px;
       height: 20px;
       border-radius: 50%;
-      border: 1px solid rgba(255,255,255,0.3);
-      background: rgba(30, 30, 40, 0.9);
+      border: 1px solid ${palette.buttonBorder};
+      background: ${palette.buttonBg};
       backdrop-filter: blur(8px);
-      color: white;
+      color: ${palette.buttonColor};
       font-size: 10px;
       cursor: pointer;
       display: flex;
@@ -391,6 +394,7 @@ function showToast(text, type = "success") {
  * Injects temporary highlight borders around annotated elements.
  */
 export async function captureFullPage() {
+    const palette = getThemePalette();
     // 1. Get all annotation data from Agentation's localStorage
     const annotations = getAllAnnotations();
     const annotationItems = annotations.map((a, i) => ({
@@ -428,9 +432,9 @@ export async function captureFullPage() {
                 left: ${rect.left - 2}px;
                 width: ${rect.width + 4}px;
                 height: ${rect.height + 4}px;
-                border: 2px solid rgba(99, 102, 241, 0.6);
+                border: 2px solid ${palette.highlightBorder};
                 border-radius: 6px;
-                background: rgba(99, 102, 241, 0.06);
+                background: ${palette.highlightBg};
                 pointer-events: none;
                 z-index: 2147483640;
                 box-sizing: border-box;

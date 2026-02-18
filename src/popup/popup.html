@@ -39,29 +39,77 @@
 
     <div class="actions" id="actions">
       <button class="action-btn" id="screenshotBtn">
-        <span class="action-icon">
+        <span class="action-icon" aria-hidden="true">
           <svg width="16" height="13" viewBox="0 0 24 20" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path
               d="M23 17C23 17.5304 22.7893 18.0391 22.4142 18.4142C22.0391 18.7893 21.5304 19 21 19H3C2.46957 19 1.96086 18.7893 1.58579 18.4142C1.21071 18.0391 1 17.5304 1 17V6C1 5.46957 1.21071 4.96086 1.58579 4.58579C1.96086 4.21071 2.46957 4 3 4H7L9 1H15L17 4H21C21.5304 4 22.0391 4.21071 22.4142 4.58579C22.7893 4.96086 23 5.46957 23 6V17Z"
-              stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-            <path
-              d="M12 15C14.2091 15 16 13.2091 16 11C16 8.79086 14.2091 7 12 7C9.79086 7 8 8.79086 8 11C8 13.2091 9.79086 15 12 15Z"
-              stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            <path d="M12 15C14.2091 15 16 13.2091 16 11C16 8.79086 14.2091 7 12 7C9.79086 7 8 8.79086 8 11C8 13.2091 9.79086 15 12 15Z"
+              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
           </svg>
         </span>
         <span>Screenshot Page</span>
       </button>
       <button class="action-btn" id="gridScreenshotBtn">
-        <span class="action-icon">
-          <svg width="14" height="14" viewBox="0 0 11 11" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path
-              d="M0 10.464V0H10.464V10.464H0ZM1.136 4.672H4.656V1.136H1.136V4.672ZM5.792 4.672H9.328V1.136H5.792V4.672ZM1.136 9.328H4.656V5.808H1.136V9.328ZM5.792 9.328H9.328V5.808H5.792V9.328Z"
-              fill="white" />
+        <span class="action-icon" aria-hidden="true">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="3" y="3" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2" />
+            <rect x="14" y="3" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2" />
+            <rect x="3" y="14" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2" />
+            <rect x="14" y="14" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2" />
           </svg>
         </span>
         <span>Screenshot Grid</span>
       </button>
+      <button class="action-btn" id="copyShareTextBtn">
+        <span class="action-icon" aria-hidden="true">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="9" y="9" width="11" height="11" rx="2" stroke="currentColor" stroke-width="2" />
+            <path d="M6 15H5C3.89543 15 3 14.1046 3 13V5C3 3.89543 3.89543 3 5 3H13C14.1046 3 15 3.89543 15 5V6"
+              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </span>
+        <span>Copy Share Text</span>
+      </button>
+      <button class="action-btn" id="copyShareUrlBtn">
+        <span class="action-icon" aria-hidden="true">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M15 7H18C20.2091 7 22 8.79086 22 11C22 13.2091 20.2091 15 18 15H15"
+              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            <path d="M9 17H6C3.79086 17 2 15.2091 2 13C2 10.7909 3.79086 9 6 9H9" stroke="currentColor"
+              stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            <path d="M8 12H16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </span>
+        <span>Copy Share URL</span>
+      </button>
+      <button class="action-btn" id="pasteShareBtn">
+        <span class="action-icon" aria-hidden="true">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 3V15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            <path d="M7 10L12 15L17 10" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+              stroke-linejoin="round" />
+            <path d="M5 21H19" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </span>
+        <span>Paste Shared Data</span>
+      </button>
     </div>
+
+    <div class="share-panel" id="sharePanel" hidden>
+      <label for="shareInput">Paste shared payload</label>
+      <textarea id="shareInput" rows="5" placeholder="Paste copied share text or full share URL..."></textarea>
+      <div class="share-options">
+        <label><input type="radio" name="importMode" value="replace" checked> Replace</label>
+        <label><input type="radio" name="importMode" value="merge"> Merge</label>
+      </div>
+      <div class="share-actions">
+        <button class="action-btn" id="confirmImportBtn">Import</button>
+        <button class="action-btn secondary" id="cancelImportBtn">Cancel</button>
+      </div>
+    </div>
+
+    <div class="status-message" id="statusMessage" role="status" aria-live="polite"></div>
 
     <div class="footer">
       <span>Powered by <a href="https://agentation.dev" target="_blank">Agentation</a></span>
